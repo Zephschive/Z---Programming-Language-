@@ -309,11 +309,12 @@ class ParseResult:
     def __init__(self):
         self.error = None
         self.node = None
+        self.advance_count =0
 
     def register_advancement(self):
       pass
     def register(self, res):
-
+       self.advance_count += res.advance_count
        if res.error: self.error = res.error
        return res.node
 
@@ -323,7 +324,8 @@ class ParseResult:
         return self
 
     def failure(self, error):
-        self.error = error
+        if not self.error or self.advance_count== 0: #haven't advanced since
+            self.error = error
         return self
 
 class Interpreter:
@@ -349,6 +351,7 @@ class Interpreter:
                 f"'{var_name}' is not defined", context
 
             ))
+        value = value.copy().set_pos(node.pos_start, node.pos_end)
         return res.success(value)
 
     def visit_VarAssignNode(self, node, context):
@@ -434,6 +437,13 @@ class Number:
         if isinstance(other,Number):
             return Number(self.value ** other.value).set_context(self.context), None
 
+
+    def copy(self):
+        copy= Number(self.value)
+        copy.set_pos(self.pos_start,self.pos_end)
+        copy.set_context(self.context)
+        return copy
+
     def __repr__(self):
         return str(self.value)
 
@@ -489,8 +499,8 @@ class Parser:
                 ))
 
         return res.failure(InvalidSyntaxError(
-            tok.pos_start, tok.pos_end,
-            "Expected int, float, '+', '-' or '('"
+            self.current_tok.pos_start, self.current_tok.pos_end,
+            "Expected int, float,identifier, '+', '-' or '('"
         ))
 
     def power(self):
@@ -542,7 +552,15 @@ class Parser:
 
             return res.success(VarAssignNode(var_name, expr))
 
-        return self.bin_op(self.term, (TT_PLUS, TT_MINUS))
+        node = res.register( self.bin_op(self.term, (TT_PLUS, TT_MINUS)))
+
+        if res.error :
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start, self.current_tok.pos_end,
+                "Expected int, float,identifier, 'zvar' '+', '-' or '('"
+            ))
+
+        return res.success(node)
 
     def bin_op(self, func_a, ops, func_b=None):
         if func_b is None:
