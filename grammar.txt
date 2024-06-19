@@ -1,10 +1,14 @@
 expr    : KEYWORD:VAR IDENTIFIER EQ expr
-        :term ((PLUS|MINUS) term)*
+        : comp-expr(KEYWORD:AND|KEYWORD:OR)comp-expr)*
+
+comp-expr        : arith-expr((<>=))arith-expr)*
+
+arith-expr :term ((PLUS|MINUS) term)*
 
 term    : factor ((MUL|DIV) factor)*
 
 factor	: (PLUS|MINUS) factor
-				: power
+		: power
 
 power		: atom (POW factor)*
 
@@ -26,3 +30,9 @@ KEYWORD     IDENTIFIER      EQULS
 
 
 zvar a = 5
+
+
+5 == 6
+false = 0
+6==6
+true =1
