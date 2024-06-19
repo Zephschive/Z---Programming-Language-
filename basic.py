@@ -408,7 +408,7 @@ class Interpreter:
     def visit_NumberNode(self, node, context):
         return RTResult().success(Number(node.tok.value).set_context(context).set_pos(node.pos_start, node.pos_end))
 
-    def visit_VarAccessNode(self,node,context):
+    def visit_VarAccessNode(self, node, context):
         res = RTResult()
         var_name = node.var_name_tok.value
         value = context.symbol_table.get(var_name)
@@ -417,20 +417,19 @@ class Interpreter:
             return res.failure(RTError(
                 node.pos_start, node.pos_end,
                 f"'{var_name}' is not defined", context
-
             ))
+
         value = value.copy().set_pos(node.pos_start, node.pos_end)
         return res.success(value)
 
     def visit_VarAssignNode(self, node, context):
         res = RTResult()
         var_name = node.var_name_tok.value
-        value= res.register(self.visit(node.value_node, context))
+        value = res.register(self.visit(node.value_node, context))
         if res.error: return res
 
         context.symbol_table.set(var_name, value)
         return res.success(value)
-
 
     def visit_BinOpNode(self, node, context):
         res = RTResult()
@@ -461,9 +460,9 @@ class Interpreter:
             result, error = left.get_comparison_lte(right)
         elif node.op_tok.type == TT_GTE:
             result, error = left.get_comparison_gte(right)
-        elif node.op_tok.matches(TT_KEYWORD,'zand'):
-            result, error = left.anded(right)
-        elif node.op_tok.type == TT_POW:
+        elif node.op_tok.matches(TT_KEYWORD, 'zand'):
+            result, error = left.anded_by(right)
+        elif node.op_tok.matches(TT_KEYWORD, 'zor'):
             result, error = left.ored_by(right)
 
         if error:
@@ -486,6 +485,7 @@ class Interpreter:
             return res.failure(error)
         else:
             return res.success(number.set_pos(node.pos_start, node.pos_end))
+
 
 class Number:
     def __init__(self, value):
@@ -521,50 +521,55 @@ class Number:
             return Number(self.value / other.value).set_context(self.context), None
 
     def powed_by(self, other):
-        if isinstance(other,Number):
+        if isinstance(other, Number):
             return Number(self.value ** other.value).set_context(self.context), None
-
-
 
     def get_comparison_eq(self, other):
         if isinstance(other, Number):
-            return Number(int(self.value == other.value)).set_context(self.context), None
+            value = global_symbol_table.get('TRUE') if self.value == other.value else global_symbol_table.get('FALSE')
+            return value.set_context(self.context), None
 
     def get_comparison_ne(self, other):
         if isinstance(other, Number):
-            return Number(int(self.value != other.value)).set_context(self.context), None
+            value = global_symbol_table.get('TRUE') if self.value != other.value else global_symbol_table.get('FALSE')
+            return value.set_context(self.context), None
 
     def get_comparison_lt(self, other):
         if isinstance(other, Number):
-            return Number(int(self.value < other.value)).set_context(self.context), None
+            value = global_symbol_table.get('TRUE') if self.value < other.value else global_symbol_table.get('FALSE')
+            return value.set_context(self.context), None
 
     def get_comparison_gt(self, other):
         if isinstance(other, Number):
-            return Number(int(self.value > other.value)).set_context(self.context), None
+            value = global_symbol_table.get('TRUE') if self.value > other.value else global_symbol_table.get('FALSE')
+            return value.set_context(self.context), None
 
     def get_comparison_lte(self, other):
         if isinstance(other, Number):
-            return Number(int(self.value <= other.value)).set_context(self.context), None
+            value = global_symbol_table.get('TRUE') if self.value <= other.value else global_symbol_table.get('FALSE')
+            return value.set_context(self.context), None
 
     def get_comparison_gte(self, other):
         if isinstance(other, Number):
-            return Number(int(self.value >= other.value)).set_context(self.context), None
+            value = global_symbol_table.get('TRUE') if self.value >= other.value else global_symbol_table.get('FALSE')
+            return value.set_context(self.context), None
 
     def anded_by(self, other):
         if isinstance(other, Number):
-            return Number(int(self.value and other.value)).set_context(self.context), None
+            value = global_symbol_table.get('TRUE') if self.value and other.value else global_symbol_table.get('FALSE')
+            return value.set_context(self.context), None
 
     def ored_by(self, other):
         if isinstance(other, Number):
-            return Number(int(self.value or other.value)).set_context(self.context), None
+            value = global_symbol_table.get('TRUE') if self.value or other.value else global_symbol_table.get('FALSE')
+            return value.set_context(self.context), None
 
     def notted(self):
-        return Number(True if self.value == 0 else False).set_context(self.context), None
-
-
+        value = global_symbol_table.get('TRUE') if self.value == 0 else global_symbol_table.get('FALSE')
+        return value.set_context(self.context), None
     def copy(self):
-        copy= Number(self.value)
-        copy.set_pos(self.pos_start,self.pos_end)
+        copy = Number(self.value)
+        copy.set_pos(self.pos_start, self.pos_end)
         copy.set_context(self.context)
         return copy
 
@@ -730,8 +735,12 @@ class Parser:
         return res.success(left)
 
 
+
 global_symbol_table = SymbolTable()
-global_symbol_table.set("null", Number(0))
+global_symbol_table.set("NULL", Number(0))
+global_symbol_table.set("TRUE", Number(1))
+global_symbol_table.set("FALSE",Number(0))
+
 def run(fn, text):
     #Generate tokens
     lexer = Lexer(fn, text)
