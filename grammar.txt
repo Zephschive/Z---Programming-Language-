@@ -16,6 +16,7 @@ atom 		: INT|FLOAT
 			: LPAREN expr RPAREN
 
 
+if statement
 zif <condition> zen <expression>	zelif <condition> zen <expression> zelse <expressions>
 
 
@@ -42,3 +43,15 @@ zvar a = 5
 false = 0
 6==6
 true =1
+
+for loop
+zor <var_name> == <start value> zto <end_value> zen <expr>
+
+
+zvar result = 1
+zor i = 0 zto 10 zen result = result * i
+
+
+
+while loop
+zile <condition> zen <expr>
