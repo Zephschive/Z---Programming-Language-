@@ -16,8 +16,9 @@ TT_POW = 'POW'
 TT_LPAREN = 'LPAREN'
 TT_RPAREN = 'RPAREN'
 TT_EOF = 'EOF'
-TT_KEYWORD = 'IDENTIFIER'
-TT_EQ = '='
+TT_IDENTIFIER	= 'IDENTIFIER'
+TT_KEYWORD		= 'KEYWORD'
+TT_EQ = 'EQ'
 TT_EE = 'EE'
 TT_NE = 'NE'
 TT_LT = 'LT'
@@ -25,10 +26,9 @@ TT_GT = 'GT'
 TT_LTE = 'LTE'
 TT_GTE = 'GTE'
 
-TT_IDENTIFIER = 'IDENTIFIER'
 
 KEYWORDS = [
-    'zvar','zand','zor','znot'
+    'zvar','zand','zor','znot','zif','zen','zelif','zelse'
 ]
 
 class Error:
@@ -157,14 +157,14 @@ class Token:
             self.pos_end.advance()
 
         if pos_end:
-            self.pos_end = pos_end
+            self.pos_end = pos_end.copy()
 
     def __repr__(self):
         if self.value: return f'{self.type}:{self.value}'
         return f'{self.type}'
 
     def matches(self,type_, value):
-        return self.type ==type_ and self.value == value
+        return self.type == type_ and self.value == value
 
 
 
@@ -185,7 +185,7 @@ class Lexer:
     def make_tokens(self):
         tokens = []
 
-        while self.current_char is not None:
+        while self.current_char != None:
             if self.current_char in ' \t':
                 self.advance()
             elif self.current_char in DIGITS:
@@ -240,13 +240,11 @@ class Lexer:
         dot_count = 0
         pos_start = self.pos.copy()
 
-        while self.current_char is not None and self.current_char in DIGITS + '.':
+        while self.current_char != None and self.current_char in DIGITS + '.':
             if self.current_char == '.':
                 if dot_count == 1: break
                 dot_count += 1
-                num_str += '.'
-            else:
-                num_str += self.current_char
+            num_str += self.current_char
             self.advance()
 
         if dot_count == 0:
@@ -373,6 +371,14 @@ class UnaryOpNode:
     def __repr__(self):
         return f'({self.op_tok}, {self.node})'
 
+class Ifnode:
+    def __init__(self, cases, else_cases):
+        self.cases = cases
+        self.else_cases = else_cases
+
+        self.pos_start = self.cases[0][0].pos_start
+        self.pos_end = (self.else_cases or self.cases[len(self.cases) - 1][0]).pos_end
+
 class ParseResult:
     def __init__(self):
         self.error = None
@@ -380,7 +386,8 @@ class ParseResult:
         self.advance_count =0
 
     def register_advancement(self):
-      pass
+      self.advance_count += 1
+
     def register(self, res):
        self.advance_count += res.advance_count
        if res.error: self.error = res.error
@@ -486,6 +493,27 @@ class Interpreter:
         else:
             return res.success(number.set_pos(node.pos_start, node.pos_end))
 
+    def visit_Ifnode(self, node, context):
+        res = RTResult()
+
+        for condition, expr in node.cases:
+            condition_value = res.register(self.visit(condition, context))
+            if res.error: return res
+
+            if condition_value.is_true():
+                expr_value = res.register(self.visit(expr, context))
+                if res.error: return res
+                return res.success(expr_value)
+
+        if node.else_case:
+            else_value = res.register(self.visit(node.else_case, context))
+            if res.error: return res
+            return res.success(else_value)
+
+        return res.success(None)
+
+
+
 
 class Number:
     def __init__(self, value):
@@ -524,58 +552,56 @@ class Number:
         if isinstance(other, Number):
             return Number(self.value ** other.value).set_context(self.context), None
 
+    def powed_by(self, other):
+        if isinstance(other, Number):
+            return Number(self.value ** other.value).set_context(self.context), None
+
     def get_comparison_eq(self, other):
         if isinstance(other, Number):
-            value = global_symbol_table.get('TRUE') if self.value == other.value else global_symbol_table.get('FALSE')
-            return value.set_context(self.context), None
+            return Number(int(self.value == other.value)).set_context(self.context), None
 
     def get_comparison_ne(self, other):
         if isinstance(other, Number):
-            value = global_symbol_table.get('TRUE') if self.value != other.value else global_symbol_table.get('FALSE')
-            return value.set_context(self.context), None
+            return Number(int(self.value != other.value)).set_context(self.context), None
 
     def get_comparison_lt(self, other):
         if isinstance(other, Number):
-            value = global_symbol_table.get('TRUE') if self.value < other.value else global_symbol_table.get('FALSE')
-            return value.set_context(self.context), None
+            return Number(int(self.value < other.value)).set_context(self.context), None
 
     def get_comparison_gt(self, other):
         if isinstance(other, Number):
-            value = global_symbol_table.get('TRUE') if self.value > other.value else global_symbol_table.get('FALSE')
-            return value.set_context(self.context), None
+            return Number(int(self.value > other.value)).set_context(self.context), None
 
     def get_comparison_lte(self, other):
         if isinstance(other, Number):
-            value = global_symbol_table.get('TRUE') if self.value <= other.value else global_symbol_table.get('FALSE')
-            return value.set_context(self.context), None
+            return Number(int(self.value <= other.value)).set_context(self.context), None
 
     def get_comparison_gte(self, other):
         if isinstance(other, Number):
-            value = global_symbol_table.get('TRUE') if self.value >= other.value else global_symbol_table.get('FALSE')
-            return value.set_context(self.context), None
+            return Number(int(self.value >= other.value)).set_context(self.context), None
 
     def anded_by(self, other):
         if isinstance(other, Number):
-            value = global_symbol_table.get('TRUE') if self.value and other.value else global_symbol_table.get('FALSE')
-            return value.set_context(self.context), None
+            return Number(int(self.value and other.value)).set_context(self.context), None
 
     def ored_by(self, other):
         if isinstance(other, Number):
-            value = global_symbol_table.get('TRUE') if self.value or other.value else global_symbol_table.get('FALSE')
-            return value.set_context(self.context), None
+            return Number(int(self.value or other.value)).set_context(self.context), None
 
     def notted(self):
-        value = global_symbol_table.get('TRUE') if self.value == 0 else global_symbol_table.get('FALSE')
-        return value.set_context(self.context), None
+        return Number(1 if self.value == 0 else 0).set_context(self.context), None
+
     def copy(self):
         copy = Number(self.value)
         copy.set_pos(self.pos_start, self.pos_end)
         copy.set_context(self.context)
         return copy
 
+    def is_true(self):
+        return self.value != 0
+
     def __repr__(self):
         return str(self.value)
-
 
 class Parser:
     def __init__(self, tokens):
@@ -597,6 +623,65 @@ class Parser:
                 "Expected '+', '-', '*', '/' or '='"
             ))
         return res
+
+    def if_expr(self):
+        res = ParseResult()
+        cases = []
+        else_case = None
+
+        if not self.current_tok.matches(TT_KEYWORD, 'zif'):
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start, self.current_tok.pos_end,
+                f"Expected 'zif'"
+            ))
+
+        res.register_advancement()
+        self.advance()
+
+        condition = res.register(self.expr())
+        if res.error: return res
+
+        if not self.current_tok.matches(TT_KEYWORD, 'zen'):
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start, self.current_tok.pos_end,
+                f"Expected 'zen'"
+            ))
+
+        res.register_advancement()
+        self.advance()
+
+        expr = res.register(self.expr())
+        if res.error: return res
+        cases.append((condition, expr))
+
+        while self.current_tok.matches(TT_KEYWORD, 'zelif'):
+            res.register_advancement()
+            self.advance()
+
+            condition = res.register(self.expr())
+            if res.error: return res
+
+            if not self.current_tok.matches(TT_KEYWORD, 'zen'):
+                return res.failure(InvalidSyntaxError(
+                    self.current_tok.pos_start, self.current_tok.pos_end,
+                    f"Expected 'zen'"
+                ))
+
+            res.register_advancement()
+            self.advance()
+
+            expr = res.register(self.expr())
+            if res.error: return res
+            cases.append((condition, expr))
+
+        if self.current_tok.matches(TT_KEYWORD, 'zelse'):
+            res.register_advancement()
+            self.advance()
+
+            else_case = res.register(self.expr())
+            if res.error: return res
+
+        return res.success(Ifnode(cases, else_case))
 
     def atom(self):
         res = ParseResult()
@@ -627,13 +712,18 @@ class Parser:
                     "Expected ')'"
                 ))
 
+        elif tok.matches(TT_KEYWORD, 'zif'):
+            if_expr = res.register(self.if_expr())
+            if res.error: return res
+            return res.success(if_expr)
+
         return res.failure(InvalidSyntaxError(
-            self.current_tok.pos_start, self.current_tok.pos_end,
-            "Expected int, float,identifier, '+', '-' or '('"
+            tok.pos_start, tok.pos_end,
+            "Expected int, float, identifier, '+', '-', '(' or 'zif'"
         ))
 
     def power(self):
-        return self.bin_op(self.atom, (TT_POW,), self.factor)
+        return self.bin_op(self.atom, (TT_POW, ), self.factor)
 
     def factor(self):
         res = ParseResult()
@@ -654,27 +744,27 @@ class Parser:
     def comp_expr(self):
         res = ParseResult()
 
-        if self.current_tok.matches(TT_KEYWORD,'znot'):
-           op_tok = self.current_tok
-           res.register_advancement()
-           self.advance()
+        if self.current_tok.matches(TT_KEYWORD, 'znot'):
+            op_tok = self.current_tok
+            res.register_advancement()
+            self.advance()
 
-           node = res.register(self.comp_expr())
-           if res.error : return res
-           return res.success(UnaryOpNode(op_tok, node))
+            node = res.register(self.comp_expr())
+            if res.error: return res
+            return res.success(UnaryOpNode(op_tok, node))
 
-        node = res.register(self.bin_op(self.arith_expr,(TT_EE, TT_NE, TT_LT, TT_GT, TT_LTE, TT_GTE)))
+        node = res.register(self.bin_op(self.arith_expr, (TT_EE, TT_NE, TT_LT, TT_GT, TT_LTE, TT_GTE)))
 
         if res.error:
-            return res.failure(InvalidSyntaxError(self.current_tok.pos_start, self.current_tok.pos_end,
-              "Expected int, float, identifier, 'znot','+','-' or '('"))
+            return res.failure(InvalidSyntaxError(
+                self.current_tok.pos_start, self.current_tok.pos_end,
+                "Expected int, float, identifier, 'zif', 'znot', '+', '-', '('"
+            ))
 
         return res.success(node)
 
-
     def arith_expr(self):
-        return self.bin_op(self.term,(TT_PLUS,TT_MINUS))
-
+        return self.bin_op(self.term, (TT_PLUS, TT_MINUS))
 
     def expr(self):
         res = ParseResult()
@@ -703,33 +793,34 @@ class Parser:
             self.advance()
             expr = res.register(self.expr())
             if res.error: return res
-
             return res.success(VarAssignNode(var_name, expr))
 
-        node = res.register( self.bin_op(self.comp_expr, ((TT_KEYWORD,"zand"),(TT_KEYWORD,"zor"))))
+        node = res.register(self.bin_op(self.comp_expr, ((TT_KEYWORD, 'zand'), (TT_KEYWORD, 'zor'))))
 
-        if res.error :
+        if res.error:
             return res.failure(InvalidSyntaxError(
                 self.current_tok.pos_start, self.current_tok.pos_end,
-                "Expected int, float,identifier, 'zvar' '+', '-' or '('"
+                "Expected 'zvar', int, float, identifier, 'zif', 'znot', '+', '-' or '('"
             ))
 
         return res.success(node)
 
     def bin_op(self, func_a, ops, func_b=None):
-        if func_b is None:
+        if func_b  == None:
             func_b = func_a
 
         res = ParseResult()
         left = res.register(func_a())
-        if res.error: return res
+        if res.error:
+            return res
 
         while self.current_tok.type in ops or (self.current_tok.type, self.current_tok.value) in ops:
             op_tok = self.current_tok
             res.register_advancement()
             self.advance()
             right = res.register(func_b())
-            if res.error: return res
+            if res.error:
+                return res
             left = BinOpNode(left, op_tok, right)
 
         return res.success(left)
@@ -758,8 +849,6 @@ def run(fn, text):
     context.symbol_table = global_symbol_table
     result = interpreter.visit(ast.node, context)
 
-    if result.error:
-        return None, result.error
-    return result.value, None
+    return result.value, result.error
 
 

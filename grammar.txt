@@ -13,7 +13,13 @@ factor	: (PLUS|MINUS) factor
 power		: atom (POW factor)*
 
 atom 		: INT|FLOAT
-				: LPAREN expr RPAREN
+			: LPAREN expr RPAREN
+
+
+zif <condition> zen <expression>	zelif <condition> zen <expression> zelse <expressions>
+
+
+
 
 
 
