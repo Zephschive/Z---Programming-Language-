@@ -15,7 +15,7 @@ power		: call (POW factor)*
 call        : atom (LPAREN  (expr (COMMA expr)*) RPAREN) ?
 
 
-atom 		: INT|FLOAT
+atom 		: INT|FLOAT|STRING|IDENTIFIER
 			: LPAREN expr RPAREN
 			: if-expr
 			: for-expr
@@ -71,4 +71,6 @@ func-def : KEYWORD : FUN IDENTIFIER?
 
 
 "Text"
-"Text "
+"Text with \"quotes"\" "
+"Text with \\ backslashes\\"
+"Text \nwith \nnewlines"
