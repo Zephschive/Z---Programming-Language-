@@ -70,3 +70,5 @@ func-def : KEYWORD : FUN IDENTIFIER?
            ARROW expr
 
 
+"Text"
+"Text "
