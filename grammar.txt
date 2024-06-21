@@ -10,10 +10,17 @@ term    : factor ((MUL|DIV) factor)*
 factor	: (PLUS|MINUS) factor
 		: power
 
-power		: atom (POW factor)*
+power		: call (POW factor)*
+
+call        : atom (LPAREN  (expr (COMMA expr)*) RPAREN) ?
+
 
 atom 		: INT|FLOAT
 			: LPAREN expr RPAREN
+			: if-expr
+			: for-expr
+			: while-expr
+			: func-expr
 
 
 if statement
@@ -55,3 +62,11 @@ zor i = 0 zto 10 zen result = result * i
 
 while loop
 zile <condition> zen <expr>
+
+
+function
+func-def : KEYWORD : FUN IDENTIFIER?
+         : LPAREN(IDENTIFIER (COMMA IDENTIFIER)*)? RPAREN
+           ARROW expr
+
+
